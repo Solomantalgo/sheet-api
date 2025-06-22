@@ -1,0 +1,36 @@
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import { appendReport } from './sheetsService.js';
+
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+app.post('/report', async (req, res) => {
+  try {
+    const { merchandiser, outlet, date, items } = req.body;
+
+    if (!merchandiser || !outlet || !date || !Array.isArray(items)) {
+      return res.status(400).json({ error: '❌ Invalid payload format' });
+    }
+
+    const itemsMap = {};
+    items.forEach((item) => {
+      if (item.name && item.qty !== undefined) {
+        itemsMap[item.name] = item.qty;
+      }
+    });
+
+    await appendReport(merchandiser, outlet, date, itemsMap);
+    return res.json({ status: '✅ Report appended to Google Sheet' });
+  } catch (error) {
+    console.error('❌ Error in /report:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
+});
