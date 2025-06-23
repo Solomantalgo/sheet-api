@@ -4,9 +4,16 @@ import bodyParser from 'body-parser';
 import { appendReport } from './sheetsService.js';
 
 const app = express();
+
 app.use(cors());
 app.use(bodyParser.json());
 
+// Health check endpoint to verify server is up
+app.get('/ping', (req, res) => {
+  res.status(200).send('Sheet API is running');
+});
+
+// Main POST endpoint to receive report data
 app.post('/report', async (req, res) => {
   try {
     const { merchandiser, outlet, date, items } = req.body;
@@ -15,6 +22,7 @@ app.post('/report', async (req, res) => {
       return res.status(400).json({ error: '❌ Invalid payload format' });
     }
 
+    // Convert array of items to map for appendReport function
     const itemsMap = {};
     items.forEach((item) => {
       if (item.name && item.qty !== undefined) {
@@ -23,6 +31,7 @@ app.post('/report', async (req, res) => {
     });
 
     await appendReport(merchandiser, outlet, date, itemsMap);
+
     return res.json({ status: '✅ Report appended to Google Sheet' });
   } catch (error) {
     console.error('❌ Error in /report:', error.message);
@@ -31,6 +40,7 @@ app.post('/report', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
