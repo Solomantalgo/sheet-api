@@ -1,4 +1,3 @@
-// sheetsService.js
 import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
@@ -7,8 +6,16 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ✅ Use secret file path from Render
+const keyFilePath = '/etc/secrets/GOOGLE_CREDENTIALS_FILE';
+
+// ✅ Check if credentials file exists
+if (!fs.existsSync(keyFilePath)) {
+  throw new Error(`❌ Google credentials file not found at: ${keyFilePath}`);
+}
+
 const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, 'credentials.json'),
+  keyFile: keyFilePath,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
@@ -41,11 +48,13 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
 
   let itemRows = itemRes.data.values || [];
 
+  // Fill item list from template if sheet is empty
   if (itemRows.length === 0 || itemRows.every(row => !row[0])) {
     const templateRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${DEFAULT_TEMPLATE_TAB}!A:A`,
     });
+
     const templateItems = templateRes.data.values || [];
 
     if (templateItems.length > 0) {
@@ -73,7 +82,6 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
   }));
 
   const matchedItems = submittedItems.filter(i => itemRowMap[i.normalized] !== undefined);
-
   if (matchedItems.length === 0) {
     throw new Error('None of the submitted items matched the sheet items.');
   }
