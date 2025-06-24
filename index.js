@@ -41,6 +41,10 @@ app.post('/report', async (req, res) => {
 
 const PORT = process.env.PORT || 8080;
 
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
