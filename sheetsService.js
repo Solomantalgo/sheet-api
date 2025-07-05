@@ -212,8 +212,13 @@ async function getNextEmptyColumn(sheets, spreadsheetId, sheetName) {
     range: `${sheetName}!1:1`,
   });
 
-  const cols = res.data.values?.[0]?.length || 0;
-  return cols + 1;
+  const row = res.data.values?.[0] || [];
+  // Find the last non-empty cell in row 1
+  let lastCol = 0;
+  for (let i = 0; i < row.length; i++) {
+    if (row[i] && row[i].toString().trim() !== '') lastCol = i + 1;
+  }
+  return lastCol + 1; // Next empty column (1-based)
 }
 
 function getColumnLetter(colNum) {
@@ -225,3 +230,5 @@ function getColumnLetter(colNum) {
   }
   return letter;
 }
+
+//
