@@ -31,7 +31,6 @@ const SPREADSHEET_IDS = {
 };
 
 const DEFAULT_TEMPLATE_TAB = 'Acacia';
-
 export async function appendReport(merchandiser, outlet, date, itemsMap) {
   const spreadsheetId = SPREADSHEET_IDS[merchandiser];
   if (!spreadsheetId) throw new Error(`Spreadsheet not found for merchandiser: ${merchandiser}`);
@@ -41,20 +40,19 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
 
   const sheetName = await ensureSheetExists(sheets, spreadsheetId, outlet, DEFAULT_TEMPLATE_TAB);
 
+  // Get item names from column A
   let itemRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: `${sheetName}!A:A`,
   });
-
   let itemRows = itemRes.data.values || [];
 
-  // Fill item list from template if sheet is empty
+  // Fill with template items if empty
   if (itemRows.length === 0 || itemRows.every(row => !row[0])) {
     const templateRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${DEFAULT_TEMPLATE_TAB}!A:A`,
     });
-
     const templateItems = templateRes.data.values || [];
 
     if (templateItems.length > 0) {
@@ -64,7 +62,6 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
         valueInputOption: 'RAW',
         requestBody: { values: templateItems },
       });
-
       itemRows = templateItems;
     }
   }
@@ -75,9 +72,12 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     if (name) itemRowMap[name] = index + 1;
   });
 
-  const submittedItems = Object.entries(itemsMap).map(([name, qty]) => ({
+  // Parse itemsMap into proper object shape with all fields
+  const submittedItems = Object.entries(itemsMap).map(([name, item]) => ({
     name,
-    qty,
+    qty: item.qty,
+    expiry: item.expiry,
+    notes: item.notes,
     normalized: name.trim().toLowerCase(),
   }));
 
@@ -87,25 +87,78 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
   }
 
   const colIndex = await getNextEmptyColumn(sheets, spreadsheetId, sheetName);
-  const colLetter = getColumnLetter(colIndex);
+  const qtyCol = getColumnLetter(colIndex);
+  const expiryCol = getColumnLetter(colIndex + 1);
+  const notesCol = getColumnLetter(colIndex + 2);
 
   const maxRow = Math.max(...matchedItems.map(i => itemRowMap[i.normalized]));
-  const values = Array(maxRow).fill(['']);
-  values[0] = [date];
-  matchedItems.forEach(i => {
-    const row = itemRowMap[i.normalized];
-    values[row - 1] = [i.qty || 0];
-  });
 
+  // --- Write Date header ---
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!${colLetter}1:${colLetter}${maxRow}`,
+    range: `${sheetName}!${qtyCol}1`,
     valueInputOption: 'RAW',
-    requestBody: { values },
+    requestBody: { values: [[date]] },
+  });
+
+  // --- Write Quantities ---
+  const qtyValues = Array(maxRow).fill(['']);
+  matchedItems.forEach(i => {
+    const row = itemRowMap[i.normalized];
+    qtyValues[row - 1] = [i.qty || 0];
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${qtyCol}2:${qtyCol}${maxRow}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: qtyValues },
+  });
+
+  // --- Write Expiry header ---
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${expiryCol}1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [['Expiry']] },
+  });
+
+  // --- Write Expiry Values ---
+  const expiryValues = Array(maxRow).fill(['']);
+  matchedItems.forEach(i => {
+    const row = itemRowMap[i.normalized];
+    expiryValues[row - 1] = [i.expiry || ''];
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${expiryCol}2:${expiryCol}${maxRow}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: expiryValues },
+  });
+
+  // --- Write Notes header ---
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${notesCol}1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [['Notes']] },
+  });
+
+  // --- Write Notes Values ---
+  const notesValues = Array(maxRow).fill(['']);
+  matchedItems.forEach(i => {
+    const row = itemRowMap[i.normalized];
+    notesValues[row - 1] = [i.notes || ''];
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${notesCol}2:${notesCol}${maxRow}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: notesValues },
   });
 
   console.log(`✅ Report saved: ${merchandiser} > ${sheetName}`);
 }
+
 
 async function ensureSheetExists(sheets, spreadsheetId, outlet, templateTab) {
   const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
