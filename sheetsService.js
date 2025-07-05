@@ -77,29 +77,56 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
   // Debug log for incoming itemsMap
   console.log('DEBUG: itemsMap received:', JSON.stringify(itemsMap, null, 2));
 
-  // Parse itemsMap into array with all needed fields and fix qty parsing
-  const submittedItems = Object.entries(itemsMap).map(([name, item]) => {
-    let qty = item.qty;
-    if (qty === null || qty === undefined || qty === 'null' || qty === '') qty = 0;
-    else if (typeof qty !== 'number') qty = parseInt(qty, 10);
-    if (isNaN(qty)) qty = 0;
+  // Support both array and object formats for itemsMap
+  let submittedItems = [];
+  if (Array.isArray(itemsMap)) {
+    submittedItems = itemsMap.map(item => {
+      let qty = item.qty;
+      if (qty === null || qty === undefined || qty === 'null' || qty === '') qty = 0;
+      else if (typeof qty !== 'number') qty = parseInt(qty, 10);
+      if (isNaN(qty)) qty = 0;
 
-    let expiry = item.expiry;
-    if (expiry === null || expiry === undefined || expiry === 'null') expiry = '';
+      let expiry = item.expiry;
+      if (expiry === null || expiry === undefined || expiry === 'null') expiry = '';
 
-    let notes = item.notes;
-    if (notes === null || notes === undefined || notes === 'null') notes = '';
+      let notes = item.notes;
+      if (notes === null || notes === undefined || notes === 'null') notes = '';
 
-    console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${notes}`);
+      const name = item.name;
+      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${notes}`);
 
-    return {
-      name,
-      qty,
-      expiry,
-      notes,
-      normalized: name.trim().toLowerCase(),
-    };
-  });
+      return {
+        name,
+        qty,
+        expiry,
+        notes,
+        normalized: name.trim().toLowerCase(),
+      };
+    });
+  } else {
+    submittedItems = Object.entries(itemsMap).map(([name, item]) => {
+      let qty = item.qty;
+      if (qty === null || qty === undefined || qty === 'null' || qty === '') qty = 0;
+      else if (typeof qty !== 'number') qty = parseInt(qty, 10);
+      if (isNaN(qty)) qty = 0;
+
+      let expiry = item.expiry;
+      if (expiry === null || expiry === undefined || expiry === 'null') expiry = '';
+
+      let notes = item.notes;
+      if (notes === null || notes === undefined || notes === 'null') notes = '';
+
+      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${notes}`);
+
+      return {
+        name,
+        qty,
+        expiry,
+        notes,
+        normalized: name.trim().toLowerCase(),
+      };
+    });
+  }
 
   const matchedItems = submittedItems.filter(i => itemRowMap[i.normalized] !== undefined);
   if (matchedItems.length === 0) {
@@ -237,3 +264,5 @@ function getColumnLetter(colNum) {
   }
   return letter;
 }
+
+//
