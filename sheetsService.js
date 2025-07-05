@@ -74,11 +74,15 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     if (name) itemRowMap[name] = index + 1; // sheet rows are 1-based
   });
 
-  // Parse itemsMap into array with all needed fields and debug
+  // Parse itemsMap into array with all needed fields and fix qty parsing
   const submittedItems = Object.entries(itemsMap).map(([name, item]) => {
-    const qty = Number(item.qty);
+    const qtyRaw = item.qty;
+    let qty = typeof qtyRaw === 'number' ? qtyRaw : parseInt(qtyRaw, 10);
+    if (isNaN(qty)) qty = 0;
+
     const expiry = item.expiry || '';
     const notes = item.notes || '';
+
     console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${notes}`);
 
     return {
@@ -109,17 +113,15 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
   const expiryValues = Array(numRowsToWrite).fill(['']);
   const notesValues = Array(numRowsToWrite).fill(['']);
 
-  // Fill arrays according to item rows with debug logs
+  // Fill arrays according to item rows
   matchedItems.forEach(i => {
     const row = itemRowMap[i.normalized];
     if (row >= startRow) {
       const arrIndex = row - startRow; // zero-based index for arrays
-      qtyValues[arrIndex] = [i.qty || 0];
-      expiryValues[arrIndex] = [i.expiry || ''];
-      notesValues[arrIndex] = [i.notes || ''];
+      qtyValues[arrIndex] = [i.qty];
+      expiryValues[arrIndex] = [i.expiry];
+      notesValues[arrIndex] = [i.notes];
       console.log(`DEBUG: Writing to row ${row} (array index ${arrIndex}) - Qty: ${i.qty}, Expiry: ${i.expiry}, Notes: ${i.notes}`);
-    } else {
-      console.log(`DEBUG: Skipping row ${row} for item ${i.name} because it's before startRow (${startRow})`);
     }
   });
 
