@@ -76,12 +76,16 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
 
   // Parse itemsMap into array with all needed fields and fix qty parsing
   const submittedItems = Object.entries(itemsMap).map(([name, item]) => {
-    const qtyRaw = item.qty;
-    let qty = typeof qtyRaw === 'number' ? qtyRaw : parseInt(qtyRaw, 10);
+    let qty = item.qty;
+    if (qty === null || qty === undefined || qty === 'null' || qty === '') qty = 0;
+    else if (typeof qty !== 'number') qty = parseInt(qty, 10);
     if (isNaN(qty)) qty = 0;
 
-    const expiry = item.expiry || '';
-    const notes = item.notes || '';
+    let expiry = item.expiry;
+    if (expiry === null || expiry === undefined || expiry === 'null') expiry = '';
+
+    let notes = item.notes;
+    if (notes === null || notes === undefined || notes === 'null') notes = '';
 
     console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${notes}`);
 
@@ -230,5 +234,3 @@ function getColumnLetter(colNum) {
   }
   return letter;
 }
-
-//
