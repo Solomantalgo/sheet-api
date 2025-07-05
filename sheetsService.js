@@ -74,6 +74,9 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     if (name) itemRowMap[name] = index + 1; // sheet rows are 1-based
   });
 
+  // Debug log for incoming itemsMap
+  console.log('DEBUG: itemsMap received:', JSON.stringify(itemsMap, null, 2));
+
   // Parse itemsMap into array with all needed fields and fix qty parsing
   const submittedItems = Object.entries(itemsMap).map(([name, item]) => {
     let qty = item.qty;
