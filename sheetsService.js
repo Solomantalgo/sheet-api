@@ -31,6 +31,7 @@ const SPREADSHEET_IDS = {
 };
 
 const DEFAULT_TEMPLATE_TAB = 'Acacia';
+
 export async function appendReport(merchandiser, outlet, date, itemsMap) {
   const spreadsheetId = SPREADSHEET_IDS[merchandiser];
   if (!spreadsheetId) throw new Error(`Spreadsheet not found for merchandiser: ${merchandiser}`);
@@ -73,14 +74,21 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     if (name) itemRowMap[name] = index + 1; // sheet rows are 1-based
   });
 
-  // Parse itemsMap into array with all needed fields
-  const submittedItems = Object.entries(itemsMap).map(([name, item]) => ({
-    name,
-    qty: item.qty,
-    expiry: item.expiry,
-    notes: item.notes,
-    normalized: name.trim().toLowerCase(),
-  }));
+  // Parse itemsMap into array with all needed fields and debug
+  const submittedItems = Object.entries(itemsMap).map(([name, item]) => {
+    const qty = Number(item.qty);
+    const expiry = item.expiry || '';
+    const notes = item.notes || '';
+    console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${notes}`);
+
+    return {
+      name,
+      qty,
+      expiry,
+      notes,
+      normalized: name.trim().toLowerCase(),
+    };
+  });
 
   const matchedItems = submittedItems.filter(i => itemRowMap[i.normalized] !== undefined);
   if (matchedItems.length === 0) {
@@ -101,7 +109,7 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
   const expiryValues = Array(numRowsToWrite).fill(['']);
   const notesValues = Array(numRowsToWrite).fill(['']);
 
-  // Fill arrays according to item rows
+  // Fill arrays according to item rows with debug logs
   matchedItems.forEach(i => {
     const row = itemRowMap[i.normalized];
     if (row >= startRow) {
@@ -109,6 +117,9 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
       qtyValues[arrIndex] = [i.qty || 0];
       expiryValues[arrIndex] = [i.expiry || ''];
       notesValues[arrIndex] = [i.notes || ''];
+      console.log(`DEBUG: Writing to row ${row} (array index ${arrIndex}) - Qty: ${i.qty}, Expiry: ${i.expiry}, Notes: ${i.notes}`);
+    } else {
+      console.log(`DEBUG: Skipping row ${row} for item ${i.name} because it's before startRow (${startRow})`);
     }
   });
 
@@ -162,7 +173,6 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
 
   console.log(`✅ Report saved: ${merchandiser} > ${sheetName}`);
 }
-
 
 async function ensureSheetExists(sheets, spreadsheetId, outlet, templateTab) {
   const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
