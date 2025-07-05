@@ -40,14 +40,14 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
 
   const sheetName = await ensureSheetExists(sheets, spreadsheetId, outlet, DEFAULT_TEMPLATE_TAB);
 
-  // Get item names from column A
+  // Get all item names from column A
   let itemRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: `${sheetName}!A:A`,
   });
   let itemRows = itemRes.data.values || [];
 
-  // Fill with template items if empty
+  // If empty, fill from template
   if (itemRows.length === 0 || itemRows.every(row => !row[0])) {
     const templateRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
@@ -66,13 +66,14 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     }
   }
 
+  // Map item names to their row number (1-based)
   const itemRowMap = {};
   itemRows.forEach((row, index) => {
     const name = row[0]?.trim().toLowerCase();
-    if (name) itemRowMap[name] = index + 1;
+    if (name) itemRowMap[name] = index + 1; // sheet rows are 1-based
   });
 
-  // Parse itemsMap into proper object shape with all fields
+  // Parse itemsMap into array with all needed fields
   const submittedItems = Object.entries(itemsMap).map(([name, item]) => ({
     name,
     qty: item.qty,
@@ -91,9 +92,27 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
   const expiryCol = getColumnLetter(colIndex + 1);
   const notesCol = getColumnLetter(colIndex + 2);
 
-  const maxRow = Math.max(...matchedItems.map(i => itemRowMap[i.normalized]));
+  const totalRows = itemRows.length;
+  const startRow = 6; // Start writing qty/expiry/notes from row 6
+  const numRowsToWrite = totalRows - startRow + 1;
 
-  // --- Write Date header ---
+  // Prepare arrays filled with empty strings for qty, expiry, notes
+  const qtyValues = Array(numRowsToWrite).fill(['']);
+  const expiryValues = Array(numRowsToWrite).fill(['']);
+  const notesValues = Array(numRowsToWrite).fill(['']);
+
+  // Fill arrays according to item rows
+  matchedItems.forEach(i => {
+    const row = itemRowMap[i.normalized];
+    if (row >= startRow) {
+      const arrIndex = row - startRow; // zero-based index for arrays
+      qtyValues[arrIndex] = [i.qty || 0];
+      expiryValues[arrIndex] = [i.expiry || ''];
+      notesValues[arrIndex] = [i.notes || ''];
+    }
+  });
+
+  // 1. Write Date at row 1 of quantity column
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!${qtyCol}1`,
@@ -101,20 +120,15 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     requestBody: { values: [[date]] },
   });
 
-  // --- Write Quantities ---
-  const qtyValues = Array(maxRow).fill(['']);
-  matchedItems.forEach(i => {
-    const row = itemRowMap[i.normalized];
-    qtyValues[row - 1] = [i.qty || 0];
-  });
+  // 2. Write Quantity values starting from row 6
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!${qtyCol}2:${qtyCol}${maxRow}`,
+    range: `${sheetName}!${qtyCol}${startRow}:${qtyCol}${totalRows}`,
     valueInputOption: 'RAW',
     requestBody: { values: qtyValues },
   });
 
-  // --- Write Expiry header ---
+  // 3. Write "Expiry" header at row 1 of expiry column
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!${expiryCol}1`,
@@ -122,20 +136,15 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     requestBody: { values: [['Expiry']] },
   });
 
-  // --- Write Expiry Values ---
-  const expiryValues = Array(maxRow).fill(['']);
-  matchedItems.forEach(i => {
-    const row = itemRowMap[i.normalized];
-    expiryValues[row - 1] = [i.expiry || ''];
-  });
+  // 4. Write Expiry values starting from row 6
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!${expiryCol}2:${expiryCol}${maxRow}`,
+    range: `${sheetName}!${expiryCol}${startRow}:${expiryCol}${totalRows}`,
     valueInputOption: 'RAW',
     requestBody: { values: expiryValues },
   });
 
-  // --- Write Notes header ---
+  // 5. Write "Notes" header at row 1 of notes column
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!${notesCol}1`,
@@ -143,15 +152,10 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     requestBody: { values: [['Notes']] },
   });
 
-  // --- Write Notes Values ---
-  const notesValues = Array(maxRow).fill(['']);
-  matchedItems.forEach(i => {
-    const row = itemRowMap[i.normalized];
-    notesValues[row - 1] = [i.notes || ''];
-  });
+  // 6. Write Notes values starting from row 6
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!${notesCol}2:${notesCol}${maxRow}`,
+    range: `${sheetName}!${notesCol}${startRow}:${notesCol}${totalRows}`,
     valueInputOption: 'RAW',
     requestBody: { values: notesValues },
   });
