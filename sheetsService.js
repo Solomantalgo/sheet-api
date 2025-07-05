@@ -32,7 +32,8 @@ const SPREADSHEET_IDS = {
 
 const DEFAULT_TEMPLATE_TAB = 'Acacia';
 
-export async function appendReport(merchandiser, outlet, date, itemsMap) {
+// Main function expects items as an array
+export async function appendReport(merchandiser, outlet, date, notes, items) {
   const spreadsheetId = SPREADSHEET_IDS[merchandiser];
   if (!spreadsheetId) throw new Error(`Spreadsheet not found for merchandiser: ${merchandiser}`);
 
@@ -74,13 +75,13 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
     if (name) itemRowMap[name] = index + 1; // sheet rows are 1-based
   });
 
-  // Debug log for incoming itemsMap
-  console.log('DEBUG: itemsMap received:', JSON.stringify(itemsMap, null, 2));
+  // Debug log for incoming items
+  console.log('DEBUG: items received:', JSON.stringify(items, null, 2));
 
-  // Support both array and object formats for itemsMap
+  // Support both array and object formats for items (for backward compatibility)
   let submittedItems = [];
-  if (Array.isArray(itemsMap)) {
-    submittedItems = itemsMap.map(item => {
+  if (Array.isArray(items)) {
+    submittedItems = items.map(item => {
       let qty = item.qty;
       if (qty === null || qty === undefined || qty === 'null' || qty === '') qty = 0;
       else if (typeof qty !== 'number') qty = parseInt(qty, 10);
@@ -89,22 +90,23 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
       let expiry = item.expiry;
       if (expiry === null || expiry === undefined || expiry === 'null') expiry = '';
 
-      let notes = item.notes;
-      if (notes === null || notes === undefined || notes === 'null') notes = '';
+      let noteVal = item.notes;
+      if (noteVal === null || noteVal === undefined || noteVal === 'null') noteVal = '';
 
       const name = item.name;
-      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${notes}`);
+      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${noteVal}`);
 
       return {
         name,
         qty,
         expiry,
-        notes,
+        notes: noteVal,
         normalized: name.trim().toLowerCase(),
       };
     });
   } else {
-    submittedItems = Object.entries(itemsMap).map(([name, item]) => {
+    // fallback for object format
+    submittedItems = Object.entries(items).map(([name, item]) => {
       let qty = item.qty;
       if (qty === null || qty === undefined || qty === 'null' || qty === '') qty = 0;
       else if (typeof qty !== 'number') qty = parseInt(qty, 10);
@@ -113,16 +115,16 @@ export async function appendReport(merchandiser, outlet, date, itemsMap) {
       let expiry = item.expiry;
       if (expiry === null || expiry === undefined || expiry === 'null') expiry = '';
 
-      let notes = item.notes;
-      if (notes === null || notes === undefined || notes === 'null') notes = '';
+      let noteVal = item.notes;
+      if (noteVal === null || noteVal === undefined || noteVal === 'null') noteVal = '';
 
-      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${notes}`);
+      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${noteVal}`);
 
       return {
         name,
         qty,
         expiry,
-        notes,
+        notes: noteVal,
         normalized: name.trim().toLowerCase(),
       };
     });
@@ -264,5 +266,3 @@ function getColumnLetter(colNum) {
   }
   return letter;
 }
-
-//
