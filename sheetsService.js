@@ -210,6 +210,21 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     spreadsheetId,
     requestBody: {
       requests: [
+        // Limit row height for notes (row 2)
+{
+  updateDimensionProperties: {
+    range: {
+      sheetId: sheetId,
+      dimension: 'ROWS',
+      startIndex: 1, // Row 2
+      endIndex: 2,
+    },
+    properties: {
+      pixelSize: 60, // You can increase or decrease this to control visible height
+    },
+    fields: 'pixelSize',
+  },
+},
         // Notes cell (row 2, date column): text wrap + light yellow fill + dark blue text
         {
           repeatCell: {
