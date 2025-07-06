@@ -165,6 +165,50 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: [[notesValue]] },
   });
 
+  // --- Format the notes cell (text wrap + light yellow fill) ---
+  function columnLetterToIndex(letter) {
+    let col = 0;
+    for (let i = 0; i < letter.length; i++) {
+      col *= 26;
+      col += letter.charCodeAt(i) - 65 + 1;
+    }
+    return col - 1;
+  }
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = spreadsheet.data.sheets.find(s => s.properties.title === sheetName);
+  const sheetId = sheet.properties.sheetId;
+  const notesColIndex = columnLetterToIndex(qtyCol);
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          repeatCell: {
+            range: {
+              sheetId: sheetId,
+              startRowIndex: 1, // Row 2 (zero-based)
+              endRowIndex: 2,
+              startColumnIndex: notesColIndex,
+              endColumnIndex: notesColIndex + 1,
+            },
+            cell: {
+              userEnteredFormat: {
+                wrapStrategy: 'WRAP',
+                backgroundColor: {
+                  red: 1,
+                  green: 1,
+                  blue: 0.6, // Light yellow
+                },
+              },
+            },
+            fields: 'userEnteredFormat(wrapStrategy,backgroundColor)',
+          },
+        },
+      ],
+    },
+  });
+
   // 3. Write Quantity values starting from row 6
   await sheets.spreadsheets.values.update({
     spreadsheetId,
@@ -191,6 +235,7 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
 
   console.log(`✅ Report saved: ${merchandiser} > ${sheetName}`);
 }
+
 async function ensureSheetExists(sheets, spreadsheetId, outlet, templateTab) {
   const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
   const existingTabs = spreadsheet.data.sheets.map(s => s.properties.title);
@@ -269,3 +314,5 @@ async function ensureEnoughColumns(sheets, spreadsheetId, sheetName, neededColIn
     console.log(`Added ${neededColIndex - currentCols} columns to "${sheetName}"`);
   }
 }
+
+//
