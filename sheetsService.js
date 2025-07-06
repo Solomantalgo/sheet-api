@@ -216,7 +216,7 @@ const noteRequest = {
             note: notesValue,
             userEnteredFormat: {
               textFormat: {
-                fontSize: 14, // readable font size
+                fontSize: 10, // readable font size
               },
             },
           },
