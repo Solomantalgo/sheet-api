@@ -235,12 +235,32 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
             fields: 'userEnteredFormat(wrapStrategy,backgroundColor,textFormat.foregroundColor)',
           },
         },
-        // Date column (header, notes, and values): light blue fill, dark blue bold text
+        // Date header (row 1): blue text, light blue background, bold
         {
           repeatCell: {
             range: {
               sheetId: sheetId,
-              startRowIndex: 0, // Header
+              startRowIndex: 0, // Row 1 (zero-based)
+              endRowIndex: 1,
+              startColumnIndex: dateColIndex,
+              endColumnIndex: dateColIndex + 1,
+            },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.8, green: 0.9, blue: 1 },
+                textFormat: { foregroundColor: { red: 0.1, green: 0.2, blue: 0.8 }, bold: true },
+                wrapStrategy: 'WRAP',
+              },
+            },
+            fields: 'userEnteredFormat(backgroundColor,textFormat,wrapStrategy)',
+          },
+        },
+        // Date values (row 6+): light blue background, dark blue text, bold
+        {
+          repeatCell: {
+            range: {
+              sheetId: sheetId,
+              startRowIndex: 2, // Skip notes row
               endRowIndex: totalRows,
               startColumnIndex: dateColIndex,
               endColumnIndex: dateColIndex + 1,
@@ -255,12 +275,32 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
             fields: 'userEnteredFormat(backgroundColor,textFormat,wrapStrategy)',
           },
         },
-        // Expiry column (header and values): light green fill, dark green bold text
+        // Expiry header (row 1): red text, light green background, bold
         {
           repeatCell: {
             range: {
               sheetId: sheetId,
-              startRowIndex: 0, // Header
+              startRowIndex: 0, // Row 1 (zero-based)
+              endRowIndex: 1,
+              startColumnIndex: expiryColIndex,
+              endColumnIndex: expiryColIndex + 1,
+            },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.85, green: 1, blue: 0.85 },
+                textFormat: { foregroundColor: { red: 0.8, green: 0.1, blue: 0.1 }, bold: true },
+                wrapStrategy: 'WRAP',
+              },
+            },
+            fields: 'userEnteredFormat(backgroundColor,textFormat,wrapStrategy)',
+          },
+        },
+        // Expiry values (row 2+): light green background, dark green text, bold
+        {
+          repeatCell: {
+            range: {
+              sheetId: sheetId,
+              startRowIndex: 1, // From row 2 (expiry values)
               endRowIndex: totalRows,
               startColumnIndex: expiryColIndex,
               endColumnIndex: expiryColIndex + 1,
@@ -360,3 +400,5 @@ async function ensureEnoughColumns(sheets, spreadsheetId, sheetName, neededColIn
     console.log(`Added ${neededColIndex - currentCols} columns to "${sheetName}"`);
   }
 }
+
+//
