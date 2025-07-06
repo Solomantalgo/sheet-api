@@ -126,10 +126,9 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
   const colIndex = await getNextEmptyColumn(sheets, spreadsheetId, sheetName);
   const qtyCol = getColumnLetter(colIndex);
   const expiryCol = getColumnLetter(colIndex + 1);
-  const notesCol = getColumnLetter(colIndex + 2);
 
-  // Ensure enough columns exist for qty, expiry, notes
-  await ensureEnoughColumns(sheets, spreadsheetId, sheetName, colIndex + 2);
+  // Ensure enough columns exist for qty and expiry only
+  await ensureEnoughColumns(sheets, spreadsheetId, sheetName, colIndex + 1);
 
   const totalRows = itemRows.length;
   const startRow = 6;
@@ -149,13 +148,6 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     }
   });
 
-  // Read notes from A2 (if present), otherwise use top-level notes or fallback
-  const notesRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${sheetName}!A2`,
-  });
-  const notesValue = notesRes.data.values?.[0]?.[0] || (notes == null || notes === '' ? 'No notes for this day' : notes);
-
   // 1. Write Date at row 1 of quantity column
   await sheets.spreadsheets.values.update({
     spreadsheetId,
@@ -164,7 +156,8 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: [[date]] },
   });
 
-  // 2. Write notes just below the date column in row 2
+  // 2. Write notes just below the date column in row 2 (from frontend, or fallback)
+  const notesValue = notes == null || notes === '' ? 'No notes for this day' : notes;
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!${qtyCol}2`,
@@ -196,17 +189,8 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: expiryValues },
   });
 
-  // 6. Write "Notes" header at row 1 of notes column
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${sheetName}!${notesCol}1`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [['Notes']] },
-  });
-
   console.log(`✅ Report saved: ${merchandiser} > ${sheetName}`);
 }
-
 async function ensureSheetExists(sheets, spreadsheetId, outlet, templateTab) {
   const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
   const existingTabs = spreadsheet.data.sheets.map(s => s.properties.title);
