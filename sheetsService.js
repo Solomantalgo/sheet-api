@@ -88,19 +88,15 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
       if (isNaN(qty)) qty = 0;
 
       let expiry = item.expiry;
-      if (expiry === null || expiry === undefined || expiry === 'null') expiry = '';
-
-      let noteVal = item.notes;
-      if (noteVal === null || noteVal === undefined || noteVal === 'null') noteVal = '';
+      if (expiry === null || expiry === undefined || expiry === 'null' || expiry === '') expiry = 'Null';
 
       const name = item.name;
-      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${noteVal}`);
+      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}`);
 
       return {
         name,
         qty,
         expiry,
-        notes: noteVal,
         normalized: name.trim().toLowerCase(),
       };
     });
@@ -113,18 +109,14 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
       if (isNaN(qty)) qty = 0;
 
       let expiry = item.expiry;
-      if (expiry === null || expiry === undefined || expiry === 'null') expiry = '';
+      if (expiry === null || expiry === undefined || expiry === 'null' || expiry === '') expiry = 'Null';
 
-      let noteVal = item.notes;
-      if (noteVal === null || noteVal === undefined || noteVal === 'null') noteVal = '';
-
-      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}, Notes: ${noteVal}`);
+      console.log(`DEBUG: Parsed item -> Name: ${name}, Qty: ${qty}, Expiry: ${expiry}`);
 
       return {
         name,
         qty,
         expiry,
-        notes: noteVal,
         normalized: name.trim().toLowerCase(),
       };
     });
@@ -144,10 +136,9 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
   const startRow = 6; // Start writing qty/expiry/notes from row 6
   const numRowsToWrite = totalRows - startRow + 1;
 
-  // Prepare arrays filled with empty strings for qty, expiry, notes
+  // Prepare arrays filled with empty strings for qty and expiry
   const qtyValues = Array(numRowsToWrite).fill(['']);
   const expiryValues = Array(numRowsToWrite).fill(['']);
-  const notesValues = Array(numRowsToWrite).fill(['']);
 
   // Fill arrays according to item rows
   matchedItems.forEach(i => {
@@ -156,8 +147,7 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
       const arrIndex = row - startRow; // zero-based index for arrays
       qtyValues[arrIndex] = [i.qty];
       expiryValues[arrIndex] = [i.expiry];
-      notesValues[arrIndex] = [i.notes];
-      console.log(`DEBUG: Writing to row ${row} (array index ${arrIndex}) - Qty: ${i.qty}, Expiry: ${i.expiry}, Notes: ${i.notes}`);
+      console.log(`DEBUG: Writing to row ${row} (array index ${arrIndex}) - Qty: ${i.qty}, Expiry: ${i.expiry}`);
     }
   });
 
@@ -201,12 +191,12 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: [['Notes']] },
   });
 
-  // 6. Write Notes values starting from row 6
+  // 6. Write top-level notes to the Notes column, row 6 (just below the "Notes" header)
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!${notesCol}${startRow}:${notesCol}${totalRows}`,
+    range: `${sheetName}!${notesCol}6`,
     valueInputOption: 'RAW',
-    requestBody: { values: notesValues },
+    requestBody: { values: [[notes == null || notes === '' ? 'No notes for this day' : notes]] },
   });
 
   console.log(`✅ Report saved: ${merchandiser} > ${sheetName}`);
