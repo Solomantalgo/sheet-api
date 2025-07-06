@@ -6,10 +6,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ Use secret file path from Render
 const keyFilePath = '/etc/secrets/GOOGLE_CREDENTIALS_FILE';
 
-// ✅ Check if credentials file exists
 if (!fs.existsSync(keyFilePath)) {
   throw new Error(`❌ Google credentials file not found at: ${keyFilePath}`);
 }
@@ -32,7 +30,6 @@ const SPREADSHEET_IDS = {
 
 const DEFAULT_TEMPLATE_TAB = 'Acacia';
 
-// Main function expects items as an array
 export async function appendReport(merchandiser, outlet, date, notes, items) {
   const spreadsheetId = SPREADSHEET_IDS[merchandiser];
   if (!spreadsheetId) throw new Error(`Spreadsheet not found for merchandiser: ${merchandiser}`);
@@ -72,7 +69,7 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
   const itemRowMap = {};
   itemRows.forEach((row, index) => {
     const name = row[0]?.trim().toLowerCase();
-    if (name) itemRowMap[name] = index + 1; // sheet rows are 1-based
+    if (name) itemRowMap[name] = index + 1;
   });
 
   // Debug log for incoming items
@@ -101,7 +98,6 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
       };
     });
   } else {
-    // fallback for object format
     submittedItems = Object.entries(items).map(([name, item]) => {
       let qty = item.qty;
       if (qty === null || qty === undefined || qty === 'null' || qty === '') qty = 0;
@@ -132,24 +128,33 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
   const expiryCol = getColumnLetter(colIndex + 1);
   const notesCol = getColumnLetter(colIndex + 2);
 
+  // Ensure enough columns exist for qty, expiry, notes
+  await ensureEnoughColumns(sheets, spreadsheetId, sheetName, colIndex + 2);
+
   const totalRows = itemRows.length;
-  const startRow = 6; // Start writing qty/expiry/notes from row 6
+  const startRow = 6;
   const numRowsToWrite = totalRows - startRow + 1;
 
   // Prepare arrays filled with empty strings for qty and expiry
   const qtyValues = Array(numRowsToWrite).fill(['']);
   const expiryValues = Array(numRowsToWrite).fill(['']);
 
-  // Fill arrays according to item rows
   matchedItems.forEach(i => {
     const row = itemRowMap[i.normalized];
     if (row >= startRow) {
-      const arrIndex = row - startRow; // zero-based index for arrays
+      const arrIndex = row - startRow;
       qtyValues[arrIndex] = [i.qty];
       expiryValues[arrIndex] = [i.expiry];
       console.log(`DEBUG: Writing to row ${row} (array index ${arrIndex}) - Qty: ${i.qty}, Expiry: ${i.expiry}`);
     }
   });
+
+  // Read notes from A2 (if present), otherwise use top-level notes or fallback
+  const notesRes = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${sheetName}!A2`,
+  });
+  const notesValue = notesRes.data.values?.[0]?.[0] || (notes == null || notes === '' ? 'No notes for this day' : notes);
 
   // 1. Write Date at row 1 of quantity column
   await sheets.spreadsheets.values.update({
@@ -159,7 +164,15 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: [[date]] },
   });
 
-  // 2. Write Quantity values starting from row 6
+  // 2. Write notes just below the date column in row 2
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${sheetName}!${qtyCol}2`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[notesValue]] },
+  });
+
+  // 3. Write Quantity values starting from row 6
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!${qtyCol}${startRow}:${qtyCol}${totalRows}`,
@@ -167,7 +180,7 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: qtyValues },
   });
 
-  // 3. Write "Expiry" header at row 1 of expiry column
+  // 4. Write "Expiry" header at row 1 of expiry column
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!${expiryCol}1`,
@@ -175,7 +188,7 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: [['Expiry']] },
   });
 
-  // 4. Write Expiry values starting from row 6
+  // 5. Write Expiry values starting from row 6
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!${expiryCol}${startRow}:${expiryCol}${totalRows}`,
@@ -183,20 +196,12 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: expiryValues },
   });
 
-  // 5. Write "Notes" header at row 1 of notes column
+  // 6. Write "Notes" header at row 1 of notes column
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${sheetName}!${notesCol}1`,
     valueInputOption: 'RAW',
     requestBody: { values: [['Notes']] },
-  });
-
-  // 6. Write top-level notes to the Notes column, row 6 (just below the "Notes" header)
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${sheetName}!${notesCol}6`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [[notes == null || notes === '' ? 'No notes for this day' : notes]] },
   });
 
   console.log(`✅ Report saved: ${merchandiser} > ${sheetName}`);
@@ -239,12 +244,11 @@ async function getNextEmptyColumn(sheets, spreadsheetId, sheetName) {
   });
 
   const row = res.data.values?.[0] || [];
-  // Find the last non-empty cell in row 1
   let lastCol = 0;
   for (let i = 0; i < row.length; i++) {
     if (row[i] && row[i].toString().trim() !== '') lastCol = i + 1;
   }
-  return lastCol + 1; // Next empty column (1-based)
+  return lastCol + 1;
 }
 
 function getColumnLetter(colNum) {
@@ -255,4 +259,29 @@ function getColumnLetter(colNum) {
     colNum = Math.floor((colNum - 1) / 26);
   }
   return letter;
+}
+
+// Helper to ensure enough columns exist
+async function ensureEnoughColumns(sheets, spreadsheetId, sheetName, neededColIndex) {
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = spreadsheet.data.sheets.find(s => s.properties.title === sheetName);
+  const currentCols = sheet.properties.gridProperties.columnCount;
+
+  if (currentCols < neededColIndex) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            appendDimension: {
+              sheetId: sheet.properties.sheetId,
+              dimension: 'COLUMNS',
+              length: neededColIndex - currentCols,
+            },
+          },
+        ],
+      },
+    });
+    console.log(`Added ${neededColIndex - currentCols} columns to "${sheetName}"`);
+  }
 }
