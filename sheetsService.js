@@ -206,11 +206,39 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
   const dateColIndex = columnLetterToIndex(qtyCol);
   const expiryColIndex = columnLetterToIndex(expiryCol);
 
+// --- SINGLE NOTE ON NOTES CELL (row 2, date column) ---
+const noteRequest = {
+  updateCells: {
+    rows: [
+      {
+        values: [
+          {
+            note: notesValue,
+            userEnteredFormat: {
+              textFormat: {
+                fontSize: 10, // readable font size
+              },
+            },
+          },
+        ],
+      },
+    ],
+    fields: 'note,userEnteredFormat.textFormat.fontSize',
+    start: {
+      sheetId: sheetId,
+      rowIndex: 1, // Row 2 (0-indexed)
+      columnIndex: dateColIndex, // Matches where the notes are written
+    },
+  },
+};
+
+
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: {
       requests: [
         // Limit row height for notes (row 2)
+        noteRequest, // 👈 Insert the note formatting FIRST
 {
   updateDimensionProperties: {
     range: {
