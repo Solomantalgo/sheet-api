@@ -16,21 +16,14 @@ app.get('/ping', (req, res) => {
 // Main POST endpoint to receive report data
 app.post('/report', async (req, res) => {
   try {
-    const { merchandiser, outlet, date, items } = req.body;
+    const { merchandiser, outlet, date, notes, items } = req.body;
 
     if (!merchandiser || !outlet || !date || !Array.isArray(items)) {
       return res.status(400).json({ error: '❌ Invalid payload format' });
     }
 
-    // Convert array of items to map for appendReport function
-    const itemsMap = {};
-    items.forEach((item) => {
-      if (item.name && item.qty !== undefined) {
-        itemsMap[item.name] = item.qty;
-      }
-    });
-
-    await appendReport(merchandiser, outlet, date, itemsMap);
+    // Pass the full items array and notes to appendReport
+    await appendReport(merchandiser, outlet, date, notes, items);
 
     return res.json({ status: '✅ Report appended to Google Sheet' });
   } catch (error) {
