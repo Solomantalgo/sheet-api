@@ -165,50 +165,6 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     requestBody: { values: [[notesValue]] },
   });
 
-  // --- Format the notes cell (text wrap + light yellow fill) ---
-  function columnLetterToIndex(letter) {
-    let col = 0;
-    for (let i = 0; i < letter.length; i++) {
-      col *= 26;
-      col += letter.charCodeAt(i) - 65 + 1;
-    }
-    return col - 1;
-  }
-  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-  const sheet = spreadsheet.data.sheets.find(s => s.properties.title === sheetName);
-  const sheetId = sheet.properties.sheetId;
-  const notesColIndex = columnLetterToIndex(qtyCol);
-
-  await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: {
-      requests: [
-        {
-          repeatCell: {
-            range: {
-              sheetId: sheetId,
-              startRowIndex: 1, // Row 2 (zero-based)
-              endRowIndex: 2,
-              startColumnIndex: notesColIndex,
-              endColumnIndex: notesColIndex + 1,
-            },
-            cell: {
-              userEnteredFormat: {
-                wrapStrategy: 'WRAP',
-                backgroundColor: {
-                  red: 1,
-                  green: 1,
-                  blue: 0.6, // Light yellow
-                },
-              },
-            },
-            fields: 'userEnteredFormat(wrapStrategy,backgroundColor)',
-          },
-        },
-      ],
-    },
-  });
-
   // 3. Write Quantity values starting from row 6
   await sheets.spreadsheets.values.update({
     spreadsheetId,
@@ -231,6 +187,96 @@ export async function appendReport(merchandiser, outlet, date, notes, items) {
     range: `${sheetName}!${expiryCol}${startRow}:${expiryCol}${totalRows}`,
     valueInputOption: 'RAW',
     requestBody: { values: expiryValues },
+  });
+
+  // --- FORMATTING SECTION ---
+
+  function columnLetterToIndex(letter) {
+    let col = 0;
+    for (let i = 0; i < letter.length; i++) {
+      col *= 26;
+      col += letter.charCodeAt(i) - 65 + 1;
+    }
+    return col - 1;
+  }
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheet = spreadsheet.data.sheets.find(s => s.properties.title === sheetName);
+  const sheetId = sheet.properties.sheetId;
+  const dateColIndex = columnLetterToIndex(qtyCol);
+  const expiryColIndex = columnLetterToIndex(expiryCol);
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        // Notes cell (row 2, date column): text wrap + light yellow fill + dark blue text
+        {
+          repeatCell: {
+            range: {
+              sheetId: sheetId,
+              startRowIndex: 1, // Row 2 (zero-based)
+              endRowIndex: 2,
+              startColumnIndex: dateColIndex,
+              endColumnIndex: dateColIndex + 1,
+            },
+            cell: {
+              userEnteredFormat: {
+                wrapStrategy: 'WRAP',
+                backgroundColor: {
+                  red: 1,
+                  green: 1,
+                  blue: 0.6, // Light yellow
+                },
+                textFormat: {
+                  foregroundColor: { red: 0.1, green: 0.2, blue: 0.5 }, // dark blue text
+                },
+              },
+            },
+            fields: 'userEnteredFormat(wrapStrategy,backgroundColor,textFormat.foregroundColor)',
+          },
+        },
+        // Date column (header, notes, and values): light blue fill, dark blue bold text
+        {
+          repeatCell: {
+            range: {
+              sheetId: sheetId,
+              startRowIndex: 0, // Header
+              endRowIndex: totalRows,
+              startColumnIndex: dateColIndex,
+              endColumnIndex: dateColIndex + 1,
+            },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.8, green: 0.9, blue: 1 },
+                textFormat: { foregroundColor: { red: 0.1, green: 0.2, blue: 0.5 }, bold: true },
+                wrapStrategy: 'WRAP',
+              },
+            },
+            fields: 'userEnteredFormat(backgroundColor,textFormat,wrapStrategy)',
+          },
+        },
+        // Expiry column (header and values): light green fill, dark green bold text
+        {
+          repeatCell: {
+            range: {
+              sheetId: sheetId,
+              startRowIndex: 0, // Header
+              endRowIndex: totalRows,
+              startColumnIndex: expiryColIndex,
+              endColumnIndex: expiryColIndex + 1,
+            },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.85, green: 1, blue: 0.85 },
+                textFormat: { foregroundColor: { red: 0.1, green: 0.4, blue: 0.1 }, bold: true },
+                wrapStrategy: 'WRAP',
+              },
+            },
+            fields: 'userEnteredFormat(backgroundColor,textFormat,wrapStrategy)',
+          },
+        },
+      ],
+    },
   });
 
   console.log(`✅ Report saved: ${merchandiser} > ${sheetName}`);
@@ -314,5 +360,3 @@ async function ensureEnoughColumns(sheets, spreadsheetId, sheetName, neededColIn
     console.log(`Added ${neededColIndex - currentCols} columns to "${sheetName}"`);
   }
 }
-
-//
